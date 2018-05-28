@@ -44,6 +44,7 @@ func (app *App) Start() error {
 	for consumer.Next() {
 		msg, _ := consumer.Message()
 		app.logger.Infof("Received %v", msg)
+		consumer.Ack(msg)
 	}
 
 	return consumer.Err()

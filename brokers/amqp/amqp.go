@@ -228,6 +228,19 @@ func (c *AMQPConsumer) close(err error) error {
 	return nil
 }
 
+func (c *AMQPConsumer) Ack(msg worq.Message) error {
+	return msg.(*AMQPMessage).delivery.Ack(
+		false, // multiple
+	)
+}
+
+func (c *AMQPConsumer) Nack(msg worq.Message, requeue bool) error {
+	return msg.(*AMQPMessage).delivery.Nack(
+		false,   // multiple
+		requeue, // requeue
+	)
+}
+
 var _ worq.Message = (*AMQPMessage)(nil)
 
 type AMQPMessage struct {
