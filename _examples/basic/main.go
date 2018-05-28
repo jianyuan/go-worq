@@ -1,8 +1,13 @@
 package main
 
 import (
-	worq "github.com/jianyuan/go-worq"
+	"log"
+
 	"github.com/sirupsen/logrus"
+	"github.com/streadway/amqp"
+
+	worq "github.com/jianyuan/go-worq"
+	amqpbroker "github.com/jianyuan/go-worq/brokers/amqp"
 )
 
 func main() {
@@ -11,9 +16,14 @@ func main() {
 		FullTimestamp: true,
 	}
 
+	broker := amqpbroker.New(func() (*amqp.Connection, error) {
+		return amqp.Dial("amqp://guest:guest@localhost:5672/")
+	})
+
 	app, _ := worq.New(
 		worq.SetLogger(logger),
+		worq.SetBroker(broker),
 	)
 
-	app.Start()
+	log.Panic(app.Start())
 }
