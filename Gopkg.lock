@@ -4,8 +4,7 @@
 [[projects]]
   name = "github.com/satori/go.uuid"
   packages = ["."]
-  revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
-  version = "v1.2.0"
+  revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -37,6 +36,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2eea1ab740e7e2ba3e3b0ea95a77b38e00681f14ef905af58eec648d415bc755"
+  inputs-digest = "d65fbb3976dc03e1a16f0085f218fad5673bcd29804c4a6d23f4b396de41331b"
   solver-name = "gps-cdcl"
   solver-version = 1

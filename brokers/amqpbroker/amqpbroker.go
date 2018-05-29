@@ -1,4 +1,4 @@
-package amqp
+package amqpbroker
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 	worq "github.com/jianyuan/go-worq"
 )
 
-type ConnectionCreator func() (*amqp.Connection, error)
+type ConnectionFactory func() (*amqp.Connection, error)
 
 var _ worq.Broker = (*AMQPBroker)(nil)
 
@@ -19,24 +19,24 @@ type AMQPBroker struct {
 	Exchange     string
 	ExchangeType string
 
-	createConn ConnectionCreator
+	connFactory ConnectionFactory
 
 	conn *amqp.Connection
 	ch   *amqp.Channel
 }
 
-func New(connectionCreator ConnectionCreator) *AMQPBroker {
+func New(connectionFactory ConnectionFactory) *AMQPBroker {
 	return &AMQPBroker{
 		Exchange:     "go-worq",
 		ExchangeType: "direct",
-		createConn:   connectionCreator,
+		connFactory:  connectionFactory,
 	}
 }
 
 func (b *AMQPBroker) getConn() (*amqp.Connection, error) {
 	if b.conn == nil {
 		var err error
-		b.conn, err = b.createConn()
+		b.conn, err = b.connFactory()
 		if err != nil {
 			return nil, err
 		}

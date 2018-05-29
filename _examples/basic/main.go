@@ -7,7 +7,7 @@ import (
 	"github.com/streadway/amqp"
 
 	worq "github.com/jianyuan/go-worq"
-	amqpbroker "github.com/jianyuan/go-worq/brokers/amqp"
+	"github.com/jianyuan/go-worq/brokers/amqpbroker"
 )
 
 func main() {
