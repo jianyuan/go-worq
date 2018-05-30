@@ -19,6 +19,7 @@ type App struct {
 	logger   logrus.FieldLogger
 	broker   Broker
 	protocol Protocol
+	binder   Binder
 
 	defaultQueue string
 
@@ -93,6 +94,7 @@ func (app *App) consumerOnNext(consumer Consumer) error {
 			app.logger.Error(err)
 			return consumer.Nack(msg, false)
 		default:
+			app.logger.Error(err)
 			return consumer.Nack(msg, true) // or requeue = false?
 		}
 	} else {
@@ -109,8 +111,16 @@ func (app *App) processMessage(msg Message) error {
 		return ErrTaskNotFound
 	}
 
-	// TODO: message specific context
-	return f.(TaskFunc)(app.Context())
+	// TODO: message specific context?
+	ctx := &context{
+		app: app,
+		logger: app.logger.WithFields(logrus.Fields{
+			"id":   msg.ID(),
+			"task": msg.Task(),
+		}),
+		msg: msg,
+	}
+	return f.(TaskFunc)(ctx)
 }
 
 // SetLogger sets the logger that the app will use.
@@ -131,6 +141,13 @@ func SetBroker(broker Broker) OptionFunc {
 func SetProtocol(protocol Protocol) OptionFunc {
 	return func(app *App) error {
 		app.protocol = protocol
+		return nil
+	}
+}
+
+func SetBinder(binder Binder) OptionFunc {
+	return func(app *App) error {
+		app.binder = binder
 		return nil
 	}
 }

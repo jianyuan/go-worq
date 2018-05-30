@@ -29,11 +29,24 @@ func main() {
 		worq.SetLogger(logger),
 		worq.SetBroker(broker),
 		worq.SetProtocol(celery.New()),
+		worq.SetBinder(celery.NewBinder()),
 		worq.SetDefaultQueue("celery"),
 	)
 
 	app.Register("tasks.add", func(ctx worq.Context) error {
 		ctx.Logger().Info("tasks.add called!")
+
+		var args struct {
+			X int `json:"x"`
+			Y int `json:"y"`
+		}
+
+		if err := ctx.Bind(&args); err != nil {
+			return err
+		}
+
+		ctx.Logger().Infof("%d + %d = %d", args.X, args.Y, args.X+args.Y)
+
 		return nil
 	})
 
