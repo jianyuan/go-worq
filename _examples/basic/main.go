@@ -16,7 +16,7 @@ func main() {
 		FullTimestamp: true,
 	}
 
-	broker := amqpbroker.New(func() (*amqp.Connection, error) {
+	broker, _ := amqpbroker.New(func() (*amqp.Connection, error) {
 		return amqp.Dial("amqp://guest:guest@localhost:5672/")
 	})
 

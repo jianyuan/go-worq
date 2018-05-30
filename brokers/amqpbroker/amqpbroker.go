@@ -11,13 +11,15 @@ import (
 	worq "github.com/jianyuan/go-worq"
 )
 
+// OptionFunc is a function that configures the AMQPBroker.
+type OptionFunc func(*AMQPBroker) error
 type ConnectionFactory func() (*amqp.Connection, error)
 
 var _ worq.Broker = (*AMQPBroker)(nil)
 
 type AMQPBroker struct {
-	Exchange     string
-	ExchangeType string
+	exchange     string
+	exchangeType string
 
 	connFactory ConnectionFactory
 
@@ -25,11 +27,33 @@ type AMQPBroker struct {
 	ch   *amqp.Channel
 }
 
-func New(connectionFactory ConnectionFactory) *AMQPBroker {
-	return &AMQPBroker{
-		Exchange:     "go-worq",
-		ExchangeType: "direct",
+func New(connectionFactory ConnectionFactory, options ...OptionFunc) (*AMQPBroker, error) {
+	b := &AMQPBroker{
+		exchange:     "go-worq",
+		exchangeType: "direct",
 		connFactory:  connectionFactory,
+	}
+
+	for _, option := range options {
+		if err := option(b); err != nil {
+			return nil, err
+		}
+	}
+
+	return b, nil
+}
+
+func SetExchange(exchange string) OptionFunc {
+	return func(b *AMQPBroker) error {
+		b.exchange = exchange
+		return nil
+	}
+}
+
+func SetExchangeType(exchangeType string) OptionFunc {
+	return func(b *AMQPBroker) error {
+		b.exchangeType = exchangeType
+		return nil
 	}
 }
 
@@ -70,8 +94,8 @@ func (b *AMQPBroker) Consume(queueName string) (worq.Consumer, error) {
 	}
 
 	if err := ch.ExchangeDeclare(
-		b.Exchange,     // name
-		b.ExchangeType, // kind
+		b.exchange,     // name
+		b.exchangeType, // kind
 		true,           // durable
 		false,          // autoDelete
 		false,          // internal
@@ -96,7 +120,7 @@ func (b *AMQPBroker) Consume(queueName string) (worq.Consumer, error) {
 	if err := ch.QueueBind(
 		queue.Name, // name
 		queue.Name, // key
-		b.Exchange, // exchange
+		b.exchange, // exchange
 		false,      // noWait
 		nil,        // args
 	); err != nil {
