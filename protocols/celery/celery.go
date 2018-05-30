@@ -7,16 +7,21 @@ import (
 	"github.com/jianyuan/go-worq/brokers/amqpbroker"
 )
 
-var _ worq.Protocol = (*CeleryProtocol)(nil)
+var (
+	ErrIDNotFound   = errors.New("celery: ID not found in header")
+	ErrTaskNotFound = errors.New("celery: Task not found in header")
+)
 
-type CeleryProtocol struct {
+var _ worq.Protocol = (*Protocol)(nil)
+
+type Protocol struct {
 }
 
-func New() *CeleryProtocol {
-	return &CeleryProtocol{}
+func New() *Protocol {
+	return &Protocol{}
 }
 
-func (c *CeleryProtocol) ID(msg worq.Message) (string, error) {
+func (c *Protocol) ID(msg worq.Message) (string, error) {
 	switch msg := msg.(type) {
 	case *amqpbroker.Message:
 		if id, ok := msg.Delivery().Headers["id"]; ok {
@@ -25,10 +30,10 @@ func (c *CeleryProtocol) ID(msg worq.Message) (string, error) {
 			}
 		}
 	}
-	return "", errors.New("CeleryProtocol: ID not found")
+	return "", ErrIDNotFound
 }
 
-func (c *CeleryProtocol) Task(msg worq.Message) (string, error) {
+func (c *Protocol) Task(msg worq.Message) (string, error) {
 	switch msg := msg.(type) {
 	case *amqpbroker.Message:
 		if id, ok := msg.Delivery().Headers["task"]; ok {
@@ -37,5 +42,5 @@ func (c *CeleryProtocol) Task(msg worq.Message) (string, error) {
 			}
 		}
 	}
-	return "", errors.New("CeleryProtocol: Task not found")
+	return "", ErrTaskNotFound
 }
