@@ -1,6 +1,7 @@
 package worq
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
 
@@ -10,6 +11,8 @@ type OptionFunc func(*App) error
 type App struct {
 	logger logrus.FieldLogger
 	broker Broker
+
+	defaultQueue string
 }
 
 func New(options ...OptionFunc) (*App, error) {
@@ -20,7 +23,8 @@ func New(options ...OptionFunc) (*App, error) {
 	}
 
 	app := &App{
-		logger: logger,
+		logger:       logger,
+		defaultQueue: "worq",
 	}
 
 	// Apply option functions
@@ -36,14 +40,15 @@ func New(options ...OptionFunc) (*App, error) {
 func (app *App) Start() error {
 	// TODO: implement me
 	app.logger.Info("Watch this space")
-	consumer, err := app.broker.Consume("go-worq")
+
+	consumer, err := app.broker.Consume(app.defaultQueue)
 	if err != nil {
 		return err
 	}
 
 	for consumer.Next() {
 		msg, _ := consumer.Message()
-		app.logger.Infof("Received %v", msg)
+		app.logger.Debug(spew.Sdump(msg))
 		consumer.Ack(msg)
 	}
 
@@ -61,6 +66,13 @@ func SetLogger(logger logrus.FieldLogger) OptionFunc {
 func SetBroker(broker Broker) OptionFunc {
 	return func(app *App) error {
 		app.broker = broker
+		return nil
+	}
+}
+
+func SetDefaultQueue(queue string) OptionFunc {
+	return func(app *App) error {
+		app.defaultQueue = queue
 		return nil
 	}
 }
