@@ -1,8 +1,15 @@
 package worq
 
 import (
-	"github.com/davecgh/go-spew/spew"
+	"errors"
+	"sync"
+
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	ErrTaskFuncIsNil = errors.New("worq: task function is nil")
+	ErrTaskNotFound  = errors.New("worq: task not found")
 )
 
 // OptionFunc is a function that configures the App.
@@ -14,6 +21,8 @@ type App struct {
 	protocol Protocol
 
 	defaultQueue string
+
+	tasks sync.Map
 }
 
 func New(options ...OptionFunc) (*App, error) {
@@ -48,6 +57,14 @@ func (app *App) Protocol() Protocol {
 	return app.protocol
 }
 
+func (app *App) Register(task string, f TaskFunc) error {
+	if f == nil {
+		return ErrTaskFuncIsNil
+	}
+	app.tasks.Store(task, f)
+	return nil
+}
+
 func (app *App) Start() error {
 	// TODO: implement me
 	app.logger.Info("Watch this space")
@@ -58,14 +75,42 @@ func (app *App) Start() error {
 	}
 
 	for consumer.Next() {
-		msg, _ := consumer.Message()
-		app.logger.Debug(spew.Sdump(msg))
-		app.logger.Infof("Task ID: %s", msg.ID())
-		app.logger.Infof("Task: %s", msg.Task())
-		consumer.Ack(msg)
+		// TODO: Set up worker pool
+		if err := app.consumerOnNext(consumer); err != nil {
+			app.logger.Errorf("error consuming message: %v", err)
+		}
 	}
 
 	return consumer.Err()
+}
+
+func (app *App) consumerOnNext(consumer Consumer) error {
+	if msg, err := consumer.Message(); err == nil {
+		switch err := app.processMessage(msg); err {
+		case nil:
+			return consumer.Ack(msg)
+		case ErrTaskNotFound:
+			app.logger.Error(err)
+			return consumer.Nack(msg, false)
+		default:
+			return consumer.Nack(msg, true) // or requeue = false?
+		}
+	} else {
+		return consumer.Nack(msg, false)
+	}
+}
+
+func (app *App) processMessage(msg Message) error {
+	app.logger.Infof("Task ID: %s", msg.ID())
+	app.logger.Infof("Task: %s", msg.Task())
+
+	f, ok := app.tasks.Load(msg.Task())
+	if !ok {
+		return ErrTaskNotFound
+	}
+
+	// TODO: message specific context
+	return f.(TaskFunc)(app.Context())
 }
 
 // SetLogger sets the logger that the app will use.

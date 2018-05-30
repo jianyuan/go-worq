@@ -32,5 +32,10 @@ func main() {
 		worq.SetDefaultQueue("celery"),
 	)
 
+	app.Register("tasks.add", func(ctx worq.Context) error {
+		ctx.Logger().Info("tasks.add called!")
+		return nil
+	})
+
 	log.Panic(app.Start())
 }
