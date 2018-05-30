@@ -23,7 +23,6 @@ type Broker struct {
 
 	connFactory ConnectionFactory
 
-	app  *worq.App
 	conn *amqp.Connection
 	ch   *amqp.Channel
 }
@@ -50,11 +49,6 @@ func SetExchange(exchange, exchangeType string) OptionFunc {
 		b.exchangeType = exchangeType
 		return nil
 	}
-}
-
-func (b *Broker) Init(app *worq.App) error {
-	b.app = app
-	return nil
 }
 
 func (b *Broker) getConn() (*amqp.Connection, error) {
@@ -85,7 +79,7 @@ func (b *Broker) getChannel() (*amqp.Channel, error) {
 	return b.ch, nil
 }
 
-func (b *Broker) Consume(queueName string) (worq.Consumer, error) {
+func (b *Broker) Consume(ctx worq.Context, queueName string) (worq.Consumer, error) {
 	var err error
 
 	ch, err := b.getChannel()
@@ -144,7 +138,7 @@ func (b *Broker) Consume(queueName string) (worq.Consumer, error) {
 	}
 
 	consumer := &Consumer{
-		app:        b.app,
+		app:        ctx.App(),
 		deliveries: deliveries,
 		cancel: func() error {
 			if ch != nil {

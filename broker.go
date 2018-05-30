@@ -1,7 +1,6 @@
 package worq
 
 type Broker interface {
-	Init(app *App) error
-	Consume(queueName string) (Consumer, error)
+	Consume(ctx Context, queueName string) (Consumer, error)
 	Close() error
 }

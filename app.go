@@ -38,6 +38,12 @@ func New(options ...OptionFunc) (*App, error) {
 	return app, nil
 }
 
+func (app *App) Context() Context {
+	return &context{
+		app: app,
+	}
+}
+
 func (app *App) Protocol() Protocol {
 	return app.protocol
 }
@@ -46,9 +52,7 @@ func (app *App) Start() error {
 	// TODO: implement me
 	app.logger.Info("Watch this space")
 
-	app.broker.Init(app)
-
-	consumer, err := app.broker.Consume(app.defaultQueue)
+	consumer, err := app.broker.Consume(app.Context(), app.defaultQueue)
 	if err != nil {
 		return err
 	}
