@@ -43,15 +43,9 @@ func New(connectionFactory ConnectionFactory, options ...OptionFunc) (*AMQPBroke
 	return b, nil
 }
 
-func SetExchange(exchange string) OptionFunc {
+func SetExchange(exchange, exchangeType string) OptionFunc {
 	return func(b *AMQPBroker) error {
 		b.exchange = exchange
-		return nil
-	}
-}
-
-func SetExchangeType(exchangeType string) OptionFunc {
-	return func(b *AMQPBroker) error {
 		b.exchangeType = exchangeType
 		return nil
 	}
