@@ -18,7 +18,7 @@ func New() *CeleryProtocol {
 
 func (c *CeleryProtocol) ID(msg worq.Message) (string, error) {
 	switch msg := msg.(type) {
-	case *amqpbroker.AMQPMessage:
+	case *amqpbroker.Message:
 		if id, ok := msg.Delivery().Headers["id"]; ok {
 			if id, ok := id.(string); ok {
 				return id, nil
@@ -30,7 +30,7 @@ func (c *CeleryProtocol) ID(msg worq.Message) (string, error) {
 
 func (c *CeleryProtocol) Task(msg worq.Message) (string, error) {
 	switch msg := msg.(type) {
-	case *amqpbroker.AMQPMessage:
+	case *amqpbroker.Message:
 		if id, ok := msg.Delivery().Headers["task"]; ok {
 			if id, ok := id.(string); ok {
 				return id, nil

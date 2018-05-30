@@ -12,12 +12,12 @@ import (
 )
 
 // OptionFunc is a function that configures the AMQPBroker.
-type OptionFunc func(*AMQPBroker) error
+type OptionFunc func(*Broker) error
 type ConnectionFactory func() (*amqp.Connection, error)
 
-var _ worq.Broker = (*AMQPBroker)(nil)
+var _ worq.Broker = (*Broker)(nil)
 
-type AMQPBroker struct {
+type Broker struct {
 	exchange     string
 	exchangeType string
 
@@ -28,8 +28,8 @@ type AMQPBroker struct {
 	ch   *amqp.Channel
 }
 
-func New(connectionFactory ConnectionFactory, options ...OptionFunc) (*AMQPBroker, error) {
-	b := &AMQPBroker{
+func New(connectionFactory ConnectionFactory, options ...OptionFunc) (*Broker, error) {
+	b := &Broker{
 		exchange:     "go-worq",
 		exchangeType: "direct",
 		connFactory:  connectionFactory,
@@ -45,19 +45,19 @@ func New(connectionFactory ConnectionFactory, options ...OptionFunc) (*AMQPBroke
 }
 
 func SetExchange(exchange, exchangeType string) OptionFunc {
-	return func(b *AMQPBroker) error {
+	return func(b *Broker) error {
 		b.exchange = exchange
 		b.exchangeType = exchangeType
 		return nil
 	}
 }
 
-func (b *AMQPBroker) Init(app *worq.App) error {
+func (b *Broker) Init(app *worq.App) error {
 	b.app = app
 	return nil
 }
 
-func (b *AMQPBroker) getConn() (*amqp.Connection, error) {
+func (b *Broker) getConn() (*amqp.Connection, error) {
 	if b.conn == nil {
 		var err error
 		b.conn, err = b.connFactory()
@@ -68,7 +68,7 @@ func (b *AMQPBroker) getConn() (*amqp.Connection, error) {
 	return b.conn, nil
 }
 
-func (b *AMQPBroker) getChannel() (*amqp.Channel, error) {
+func (b *Broker) getChannel() (*amqp.Channel, error) {
 	if b.ch == nil {
 		var conn *amqp.Connection
 		var err error
@@ -85,7 +85,7 @@ func (b *AMQPBroker) getChannel() (*amqp.Channel, error) {
 	return b.ch, nil
 }
 
-func (b *AMQPBroker) Consume(queueName string) (worq.Consumer, error) {
+func (b *Broker) Consume(queueName string) (worq.Consumer, error) {
 	var err error
 
 	ch, err := b.getChannel()
@@ -143,7 +143,7 @@ func (b *AMQPBroker) Consume(queueName string) (worq.Consumer, error) {
 		return nil, err
 	}
 
-	consumer := &AMQPConsumer{
+	consumer := &Consumer{
 		app:        b.app,
 		deliveries: deliveries,
 		cancel: func() error {
@@ -162,7 +162,7 @@ func (b *AMQPBroker) Consume(queueName string) (worq.Consumer, error) {
 	return consumer, nil
 }
 
-func (b *AMQPBroker) Close() error {
+func (b *Broker) Close() error {
 	// TODO: cancel all active consumers
 	if b.conn != nil {
 		return b.conn.Close()
@@ -170,9 +170,9 @@ func (b *AMQPBroker) Close() error {
 	return nil
 }
 
-var _ worq.Consumer = (*AMQPConsumer)(nil)
+var _ worq.Consumer = (*Consumer)(nil)
 
-type AMQPConsumer struct {
+type Consumer struct {
 	app *worq.App
 
 	deliveries <-chan amqp.Delivery
@@ -181,11 +181,11 @@ type AMQPConsumer struct {
 	closemu sync.RWMutex
 	closed  bool
 
-	message *AMQPMessage
+	message *Message
 	lasterr error
 }
 
-func (c *AMQPConsumer) Next() bool {
+func (c *Consumer) Next() bool {
 	doClose, ok := c.next()
 	if doClose {
 		c.Close()
@@ -193,7 +193,7 @@ func (c *AMQPConsumer) Next() bool {
 	return ok
 }
 
-func (c *AMQPConsumer) next() (doClose, ok bool) {
+func (c *Consumer) next() (doClose, ok bool) {
 	c.closemu.RLock()
 	defer c.closemu.RUnlock()
 
@@ -206,18 +206,18 @@ func (c *AMQPConsumer) next() (doClose, ok bool) {
 		return true, false
 	}
 
-	c.message = &AMQPMessage{
+	c.message = &Message{
 		app:      c.app,
 		delivery: &delivery,
 	}
 	return false, true
 }
 
-func (c *AMQPConsumer) Err() error {
+func (c *Consumer) Err() error {
 	return c.lasterr
 }
 
-func (c *AMQPConsumer) Message() (worq.Message, error) {
+func (c *Consumer) Message() (worq.Message, error) {
 	c.closemu.RLock()
 	defer c.closemu.RUnlock()
 
@@ -232,11 +232,11 @@ func (c *AMQPConsumer) Message() (worq.Message, error) {
 	return c.message, nil
 }
 
-func (c *AMQPConsumer) Close() error {
+func (c *Consumer) Close() error {
 	return c.close(nil)
 }
 
-func (c *AMQPConsumer) close(err error) error {
+func (c *Consumer) close(err error) error {
 	c.closemu.Lock()
 	defer c.closemu.Unlock()
 
@@ -256,37 +256,37 @@ func (c *AMQPConsumer) close(err error) error {
 	return nil
 }
 
-func (c *AMQPConsumer) Ack(msg worq.Message) error {
-	return msg.(*AMQPMessage).delivery.Ack(
+func (c *Consumer) Ack(msg worq.Message) error {
+	return msg.(*Message).delivery.Ack(
 		false, // multiple
 	)
 }
 
-func (c *AMQPConsumer) Nack(msg worq.Message, requeue bool) error {
-	return msg.(*AMQPMessage).delivery.Nack(
+func (c *Consumer) Nack(msg worq.Message, requeue bool) error {
+	return msg.(*Message).delivery.Nack(
 		false,   // multiple
 		requeue, // requeue
 	)
 }
 
-var _ worq.Message = (*AMQPMessage)(nil)
+var _ worq.Message = (*Message)(nil)
 
-type AMQPMessage struct {
+type Message struct {
 	app      *worq.App
 	delivery *amqp.Delivery
 }
 
-func (msg *AMQPMessage) Delivery() *amqp.Delivery {
+func (msg *Message) Delivery() *amqp.Delivery {
 	return msg.delivery
 }
 
-func (msg *AMQPMessage) ID() string {
+func (msg *Message) ID() string {
 	id, err := msg.app.Protocol().ID(msg)
 	_ = err // TODO
 	return id
 }
 
-func (msg *AMQPMessage) Task() string {
+func (msg *Message) Task() string {
 	task, err := msg.app.Protocol().Task(msg)
 	_ = err // TODO
 	return task
