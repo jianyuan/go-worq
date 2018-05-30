@@ -23,6 +23,7 @@ type AMQPBroker struct {
 
 	connFactory ConnectionFactory
 
+	app  *worq.App
 	conn *amqp.Connection
 	ch   *amqp.Channel
 }
@@ -49,6 +50,11 @@ func SetExchange(exchange, exchangeType string) OptionFunc {
 		b.exchangeType = exchangeType
 		return nil
 	}
+}
+
+func (b *AMQPBroker) Init(app *worq.App) error {
+	b.app = app
+	return nil
 }
 
 func (b *AMQPBroker) getConn() (*amqp.Connection, error) {
@@ -138,6 +144,7 @@ func (b *AMQPBroker) Consume(queueName string) (worq.Consumer, error) {
 	}
 
 	consumer := &AMQPConsumer{
+		app:        b.app,
 		deliveries: deliveries,
 		cancel: func() error {
 			if ch != nil {
@@ -166,6 +173,8 @@ func (b *AMQPBroker) Close() error {
 var _ worq.Consumer = (*AMQPConsumer)(nil)
 
 type AMQPConsumer struct {
+	app *worq.App
+
 	deliveries <-chan amqp.Delivery
 	cancel     func() error
 
@@ -198,6 +207,7 @@ func (c *AMQPConsumer) next() (doClose, ok bool) {
 	}
 
 	c.message = &AMQPMessage{
+		app:      c.app,
 		delivery: &delivery,
 	}
 	return false, true
@@ -262,5 +272,22 @@ func (c *AMQPConsumer) Nack(msg worq.Message, requeue bool) error {
 var _ worq.Message = (*AMQPMessage)(nil)
 
 type AMQPMessage struct {
+	app      *worq.App
 	delivery *amqp.Delivery
+}
+
+func (msg *AMQPMessage) Delivery() *amqp.Delivery {
+	return msg.delivery
+}
+
+func (msg *AMQPMessage) ID() string {
+	id, err := msg.app.Protocol().ID(msg)
+	_ = err // TODO
+	return id
+}
+
+func (msg *AMQPMessage) Task() string {
+	task, err := msg.app.Protocol().Task(msg)
+	_ = err // TODO
+	return task
 }

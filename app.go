@@ -9,8 +9,9 @@ import (
 type OptionFunc func(*App) error
 
 type App struct {
-	logger logrus.FieldLogger
-	broker Broker
+	logger   logrus.FieldLogger
+	broker   Broker
+	protocol Protocol
 
 	defaultQueue string
 }
@@ -37,9 +38,15 @@ func New(options ...OptionFunc) (*App, error) {
 	return app, nil
 }
 
+func (app *App) Protocol() Protocol {
+	return app.protocol
+}
+
 func (app *App) Start() error {
 	// TODO: implement me
 	app.logger.Info("Watch this space")
+
+	app.broker.Init(app)
 
 	consumer, err := app.broker.Consume(app.defaultQueue)
 	if err != nil {
@@ -49,6 +56,8 @@ func (app *App) Start() error {
 	for consumer.Next() {
 		msg, _ := consumer.Message()
 		app.logger.Debug(spew.Sdump(msg))
+		app.logger.Infof("Task ID: %s", msg.ID())
+		app.logger.Infof("Task: %s", msg.Task())
 		consumer.Ack(msg)
 	}
 
@@ -66,6 +75,13 @@ func SetLogger(logger logrus.FieldLogger) OptionFunc {
 func SetBroker(broker Broker) OptionFunc {
 	return func(app *App) error {
 		app.broker = broker
+		return nil
+	}
+}
+
+func SetProtocol(protocol Protocol) OptionFunc {
+	return func(app *App) error {
+		app.protocol = protocol
 		return nil
 	}
 }
