@@ -8,8 +8,7 @@ import (
 )
 
 var (
-	ErrTaskFuncIsNil = errors.New("worq: task function is nil")
-	ErrTaskNotFound  = errors.New("worq: task not found")
+	ErrTaskNotFound = errors.New("worq: task not found")
 )
 
 // OptionFunc is a function that configures the App.
@@ -58,11 +57,18 @@ func (app *App) Protocol() Protocol {
 	return app.protocol
 }
 
-func (app *App) Register(task string, f TaskFunc) error {
-	if f == nil {
-		return ErrTaskFuncIsNil
+func (app *App) Register(name string, f TaskFunc) error {
+	if name == "" {
+		return errors.New("worq.Register: task name is empty")
 	}
-	app.tasks.Store(task, f)
+
+	if f == nil {
+		return errors.New("worq.Register: task function is nil")
+	}
+
+	if _, dup := app.tasks.LoadOrStore(name, f); dup {
+		return errors.New("worq.Register: task already defined: " + name)
+	}
 	return nil
 }
 
