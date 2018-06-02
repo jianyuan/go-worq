@@ -7,9 +7,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	ErrTaskNotFound = errors.New("worq: task not found")
-)
+type TaskNotFound struct {
+	Name string
+}
+
+func (t TaskNotFound) Error() string {
+	return "worq: cannot find task " + t.Name
+}
 
 // OptionFunc is a function that configures the App.
 type OptionFunc func(*App) error
@@ -22,7 +26,7 @@ type App struct {
 
 	defaultQueue string
 
-	tasks sync.Map
+	taskMap sync.Map // map[string]TaskFunc
 }
 
 func New(options ...OptionFunc) (*App, error) {
@@ -66,7 +70,7 @@ func (app *App) Register(name string, f TaskFunc) error {
 		return errors.New("worq.Register: task function is nil")
 	}
 
-	if _, dup := app.tasks.LoadOrStore(name, f); dup {
+	if _, dup := app.taskMap.LoadOrStore(name, f); dup {
 		return errors.New("worq.Register: task already defined: " + name)
 	}
 	return nil
@@ -93,10 +97,10 @@ func (app *App) Start() error {
 
 func (app *App) consumerOnNext(consumer Consumer) error {
 	if msg, err := consumer.Message(); err == nil {
-		switch err := app.processMessage(msg); err {
+		switch err := app.processMessage(msg).(type) {
 		case nil:
 			return consumer.Ack(msg)
-		case ErrTaskNotFound:
+		case *TaskNotFound:
 			app.logger.Error(err)
 			return consumer.Nack(msg, false)
 		default:
@@ -112,9 +116,9 @@ func (app *App) processMessage(msg Message) error {
 	app.logger.Infof("Task ID: %s", msg.ID())
 	app.logger.Infof("Task: %s", msg.Task())
 
-	f, ok := app.tasks.Load(msg.Task())
+	f, ok := app.taskMap.Load(msg.Task())
 	if !ok {
-		return ErrTaskNotFound
+		return &TaskNotFound{msg.Task()}
 	}
 
 	// TODO: message specific context?
