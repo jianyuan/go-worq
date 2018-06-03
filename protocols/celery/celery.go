@@ -73,15 +73,36 @@ func (Binder) Bind(ctx worq.Context, v interface{}) error {
 	case *amqpbroker.Message:
 		switch msg.Delivery().ContentType {
 		case MIMEApplicationJSON:
-			var data [3]json.RawMessage
-			if err := json.Unmarshal(msg.Delivery().Body, &data); err != nil {
+			var body TaskBody
+			if err := json.Unmarshal(msg.Delivery().Body, &body); err != nil {
 				return err
 			}
 
-			// TODO: process positional args
+			// TODO: process position args
 
-			return json.Unmarshal(data[1], v)
+			return json.Unmarshal(body[1], v)
 		}
 	}
 	return ErrUnsupportedContentType
+}
+
+// TaskBody is a 3-length array with the shape: [TaskArgs, TaskKWArgs, TaskEmbed]
+type TaskBody [3]json.RawMessage
+
+type TaskArgs []interface{}
+
+type TaskKWArgs map[string]interface{}
+
+type TaskEmbed struct {
+	Callbacks []*TaskSignature `json:"callbacks"`
+	Errbacks  []*TaskSignature `json:"errbacks"`
+	Chain     []*TaskSignature `json:"chain"`
+	Chord     *TaskSignature   `json:"chord"`
+}
+
+type TaskSignature struct {
+	Task    string                 `json:"task"`
+	Args    []interface{}          `json:"args"`
+	KWArgs  map[string]interface{} `json:"kwargs"`
+	Options map[string]interface{} `json:"options"`
 }
