@@ -9,17 +9,22 @@ type Context interface {
 
 	Logger() logrus.FieldLogger
 
+	Consumer() Consumer
+
 	Message() Message
 
 	Bind(v interface{}) error
+
+	Reject(requeue bool) error
 }
 
 var _ Context = (*context)(nil)
 
 type context struct {
-	app    *App
-	logger logrus.FieldLogger
-	msg    Message
+	app      *App
+	logger   logrus.FieldLogger
+	consumer Consumer
+	msg      Message
 }
 
 func (ctx *context) App() *App {
@@ -33,10 +38,18 @@ func (ctx *context) Logger() logrus.FieldLogger {
 	return ctx.app.logger
 }
 
+func (ctx *context) Consumer() Consumer {
+	return ctx.consumer
+}
+
 func (ctx *context) Message() Message {
 	return ctx.msg
 }
 
 func (ctx *context) Bind(v interface{}) error {
 	return ctx.app.binder.Bind(ctx, v)
+}
+
+func (ctx *context) Reject(requeue bool) error {
+	return &TaskRejected{Requeue: requeue}
 }

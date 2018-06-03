@@ -2,10 +2,19 @@ package worq
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 )
+
+type TaskRejected struct {
+	Requeue bool
+}
+
+func (t TaskRejected) Error() string {
+	return fmt.Sprintf("worq: task rejected; requeue: %v", t.Requeue)
+}
 
 type TaskNotFound struct {
 	Name string
@@ -96,15 +105,33 @@ func (app *App) Start() error {
 }
 
 func (app *App) consumerOnNext(consumer Consumer) error {
+	// TODO: Convert this into a consumer struct
+
 	if msg, err := consumer.Message(); err == nil {
-		switch err := app.processMessage(msg).(type) {
+		// TODO: message specific context?
+		ctx := &context{
+			app: app,
+			logger: app.logger.WithFields(logrus.Fields{
+				"id":   msg.ID(),
+				"task": msg.Task(),
+			}),
+			consumer: consumer,
+			msg:      msg,
+		}
+
+		ctx.Logger().Info("Task received")
+
+		switch err := app.processMessage(ctx).(type) {
 		case nil:
 			return consumer.Ack(msg)
 		case *TaskNotFound:
-			app.logger.Error(err)
+			ctx.logger.Error(err)
 			return consumer.Nack(msg, false)
+		case *TaskRejected:
+			ctx.logger.Warn(err)
+			return consumer.Nack(msg, err.Requeue)
 		default:
-			app.logger.Error(err)
+			ctx.logger.Error(err)
 			return consumer.Nack(msg, true) // or requeue = false?
 		}
 	} else {
@@ -112,23 +139,10 @@ func (app *App) consumerOnNext(consumer Consumer) error {
 	}
 }
 
-func (app *App) processMessage(msg Message) error {
-	app.logger.Infof("Task ID: %s", msg.ID())
-	app.logger.Infof("Task: %s", msg.Task())
-
-	f, ok := app.taskMap.Load(msg.Task())
+func (app *App) processMessage(ctx Context) error {
+	f, ok := app.taskMap.Load(ctx.Message().Task())
 	if !ok {
-		return &TaskNotFound{msg.Task()}
-	}
-
-	// TODO: message specific context?
-	ctx := &context{
-		app: app,
-		logger: app.logger.WithFields(logrus.Fields{
-			"id":   msg.ID(),
-			"task": msg.Task(),
-		}),
-		msg: msg,
+		return &TaskNotFound{ctx.Message().Task()}
 	}
 	return f.(TaskFunc)(ctx)
 }
