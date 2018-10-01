@@ -7,7 +7,6 @@ import (
 	"github.com/streadway/amqp"
 
 	worq "github.com/jianyuan/go-worq"
-	"github.com/jianyuan/go-worq/brokers/amqpbroker"
 )
 
 const (
@@ -40,21 +39,15 @@ func amqpTableStringOk(t amqp.Table, key string) (string, bool) {
 }
 
 func (Protocol) ID(msg worq.Message) (string, error) {
-	switch msg := msg.(type) {
-	case *amqpbroker.Message:
-		if id, ok := amqpTableStringOk(msg.Delivery().Headers, "id"); ok {
-			return id, nil
-		}
+	if id, ok := amqpTableStringOk(msg.Headers(), "id"); ok {
+		return id, nil
 	}
 	return "", ErrIDMissing
 }
 
 func (Protocol) Task(msg worq.Message) (string, error) {
-	switch msg := msg.(type) {
-	case *amqpbroker.Message:
-		if task, ok := amqpTableStringOk(msg.Delivery().Headers, "task"); ok {
-			return task, nil
-		}
+	if task, ok := amqpTableStringOk(msg.Headers(), "task"); ok {
+		return task, nil
 	}
 	return "", ErrTaskMissing
 }
@@ -69,19 +62,18 @@ func NewBinder() *Binder {
 }
 
 func (Binder) Bind(ctx worq.Context, v interface{}) error {
-	switch msg := ctx.Message().(type) {
-	case *amqpbroker.Message:
-		switch msg.Delivery().ContentType {
-		case MIMEApplicationJSON:
-			var body TaskBody
-			if err := json.Unmarshal(msg.Delivery().Body, &body); err != nil {
-				return err
-			}
-
-			// TODO: process position args
-
-			return json.Unmarshal(body[1], v)
+	msg := ctx.Message()
+	switch msg.ContentType() {
+	case MIMEApplicationJSON:
+		var body TaskBody
+		if err := json.Unmarshal(msg.Body(), &body); err != nil {
+			return err
 		}
+
+		// TODO: process position args
+		ctx.Logger().Debug(string(msg.Body()))
+
+		return json.Unmarshal(body[1], v)
 	}
 	return ErrUnsupportedContentType
 }
