@@ -270,10 +270,6 @@ type Message struct {
 	delivery *amqp.Delivery
 }
 
-func (msg *Message) Delivery() *amqp.Delivery {
-	return msg.delivery
-}
-
 func (msg *Message) ID() string {
 	id, err := msg.app.Protocol().ID(msg)
 	_ = err // TODO
@@ -284,4 +280,20 @@ func (msg *Message) Task() string {
 	task, err := msg.app.Protocol().Task(msg)
 	_ = err // TODO
 	return task
+}
+
+func (msg *Message) Headers() map[string]interface{} {
+	m := make(map[string]interface{}, len(msg.delivery.Headers))
+	for k, v := range msg.delivery.Headers {
+		m[k] = v
+	}
+	return m
+}
+
+func (msg *Message) ContentType() string {
+	return msg.delivery.ContentType
+}
+
+func (msg *Message) Body() []byte {
+	return msg.delivery.Body
 }
