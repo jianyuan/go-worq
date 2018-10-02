@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/streadway/amqp"
 
 	worq "github.com/jianyuan/go-worq"
