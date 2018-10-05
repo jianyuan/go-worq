@@ -1,15 +1,13 @@
 package worq
 
 type Signature struct {
-	app  *App
-	task string
-	args interface{}
+	App  *App
+	Task string
+	Args interface{}
 	// TODO: callbacks, errbacks, chain, chord
 }
 
-func NewSignature(task string, args interface{}) *Signature {
-	return &Signature{
-		task: task,
-		args: args,
-	}
+func (sig *Signature) Queue() string {
+	// TODO: task router
+	return sig.App.defaultQueue
 }

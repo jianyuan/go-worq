@@ -147,6 +147,14 @@ func (app *App) processMessage(ctx Context) error {
 	return f.(TaskFunc)(ctx)
 }
 
+func (app *App) NewSignature(task string, args interface{}) *Signature {
+	sig := new(Signature)
+	sig.App = app
+	sig.Task = task
+	sig.Args = args
+	return sig
+}
+
 // SetLogger sets the logger that the app will use.
 func SetLogger(logger logrus.FieldLogger) OptionFunc {
 	return func(app *App) error {
