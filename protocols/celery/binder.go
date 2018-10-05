@@ -65,3 +65,40 @@ func (Binder) Bind(ctx worq.Context, v interface{}) error {
 	}
 	return ErrUnsupportedContentType
 }
+
+func (Binder) Unbind(ctx worq.Context, id string, queue string, sig *worq.Signature) (*worq.Publishing, error) {
+	pub := new(worq.Publishing)
+
+	pub.Queue = queue
+
+	pub.Headers = make(map[string]interface{}, 2)
+	pub.Headers["id"] = id
+	pub.Headers["task"] = sig.Task
+
+	pub.ContentType = MIMEApplicationJSON
+
+	body := new(TaskBody)
+	body[0] = json.RawMessage([]byte("[]"))
+
+	// Args
+	bodyArgs, err := json.Marshal(sig.Args)
+	if err != nil {
+		return nil, err
+	}
+	body[1] = json.RawMessage(bodyArgs)
+
+	embed := new(TaskEmbed)
+	// TODO: callbacks, errbacks, chain, chord
+	bodyEmbed, err := json.Marshal(embed)
+	if err != nil {
+		return nil, err
+	}
+	body[2] = json.RawMessage(bodyEmbed)
+
+	pub.Body, err = json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return pub, nil
+}

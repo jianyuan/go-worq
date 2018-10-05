@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,6 +35,7 @@ type App struct {
 	binder   Binder
 
 	defaultQueue string
+	idFunc       func() string
 
 	taskMap sync.Map // map[string]TaskFunc
 }
@@ -45,9 +47,11 @@ func New(options ...OptionFunc) (*App, error) {
 		FullTimestamp: true,
 	}
 
-	app := &App{
-		logger:       logger,
-		defaultQueue: "worq",
+	app := new(App)
+	app.logger = logger
+	app.defaultQueue = "worq"
+	app.idFunc = func() string {
+		return uuid.Must(uuid.NewV4()).String()
 	}
 
 	// Apply option functions
@@ -147,12 +151,34 @@ func (app *App) processMessage(ctx Context) error {
 	return f.(TaskFunc)(ctx)
 }
 
-func (app *App) NewSignature(task string, args interface{}) *Signature {
-	sig := new(Signature)
-	sig.App = app
-	sig.Task = task
-	sig.Args = args
-	return sig
+func (app *App) Enqueue(sig *Signature) (*AsyncResult, error) {
+	var err error
+
+	queue := app.queueForSignature(sig)
+	id := app.idFunc()
+
+	publishing, err := app.binder.Unbind(app.Context(), id, queue, sig)
+	if err != nil {
+		return nil, err
+	}
+
+	err = app.broker.Enqueue(publishing)
+	if err != nil {
+		return nil, err
+	}
+
+	result := new(AsyncResult)
+	result.ID = id
+	return result, nil
+}
+
+func (app *App) queueForSignature(sig *Signature) string {
+	// TODO: proper routing
+	return app.defaultQueue
+}
+
+func (app *App) Binder() Binder {
+	return app.binder
 }
 
 // SetLogger sets the logger that the app will use.

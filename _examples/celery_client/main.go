@@ -1,8 +1,7 @@
 package main
 
 import (
-	"log"
-
+	"github.com/kr/pretty"
 	"github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 
@@ -37,25 +36,13 @@ func main() {
 		X int `json:"x"`
 		Y int `json:"y"`
 	}
-	var args addArgs
 
-	app.Register("tasks.add", func(ctx worq.Context) error {
-		ctx.Logger().Info("tasks.add called!")
-
-		if err := ctx.Bind(&args); err != nil {
-			return err
+	for {
+		logger.Infoln("Enqueuing")
+		result, err := app.Enqueue(worq.NewSignature("tasks.add", &addArgs{X: 2, Y: 10}))
+		if err != nil {
+			panic(err)
 		}
-
-		ctx.Logger().Info(ctx.Message())
-
-		ctx.Logger().Infof("%d + %d = %d", args.X, args.Y, args.X+args.Y)
-
-		ctx.Logger().Info(ctx.Message().Headers())
-
-		return ctx.Reject(false)
-	})
-
-	if err := app.Start(); err != nil {
-		log.Panic(err)
+		pretty.Println(result)
 	}
 }

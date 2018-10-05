@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	uuid "github.com/gofrs/uuid"
 	"github.com/streadway/amqp"
@@ -75,6 +76,12 @@ func (b *Broker) getChannel() (*amqp.Channel, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Put this channel into confirm mode
+		// err = b.ch.Confirm(false)
+		// if err != nil {
+		// 	return nil, err
+		// }
 	}
 	return b.ch, nil
 }
@@ -124,6 +131,8 @@ func (b *Broker) Consume(ctx worq.Context, queueName string) (worq.Consumer, err
 	// TODO: customisation
 	ctag := fmt.Sprintf("worq-%s", uuid.Must(uuid.NewV4()))
 
+	// TODO: prefetch using ch.Qos()
+
 	deliveries, err := ch.Consume(
 		queue.Name, // queue
 		ctag,       // tag
@@ -161,6 +170,48 @@ func (b *Broker) Close() error {
 	if b.conn != nil {
 		return b.conn.Close()
 	}
+	return nil
+}
+
+func (b *Broker) Enqueue(pub *worq.Publishing) error {
+	if pub == nil {
+		return errors.New("amqpbroker: Enqueue(nil)")
+	}
+
+	var err error
+
+	ch, err := b.getChannel()
+	if err != nil {
+		return err
+	}
+
+	// confirms := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+
+	// TODO: Retries
+	err = ch.Publish(
+		b.exchange, // exchange
+		pub.Queue,  // key
+		false,      // mandatory
+		false,      // immediate,
+		amqp.Publishing{
+			Headers:      pub.Headers,
+			ContentType:  pub.ContentType,
+			DeliveryMode: amqp.Persistent,
+			Timestamp:    time.Now(),
+			Body:         pub.Body,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// if confirmed := <-confirms; confirmed.Ack {
+	// 	return nil
+	// }
+
+	// return errors.New("amqpbroker.Enqueue: Failed to receive acknowledgement from broker")
+
+	// TODO: return publishing
 	return nil
 }
 
