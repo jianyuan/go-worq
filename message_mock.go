@@ -1,11 +1,16 @@
 package worq
 
 type MockMessage struct {
+	MockQueue       string
 	MockID          string
 	MockTask        string
 	MockHeaders     map[string]interface{}
 	MockContentType string
 	MockBody        []byte
+}
+
+func (msg *MockMessage) Queue() string {
+	return msg.MockQueue
 }
 
 func (msg *MockMessage) ID() string {

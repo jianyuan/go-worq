@@ -270,6 +270,10 @@ type Message struct {
 	delivery *amqp.Delivery
 }
 
+func (msg *Message) Queue() string {
+	return msg.delivery.RoutingKey
+}
+
 func (msg *Message) ID() string {
 	id, err := msg.app.Protocol().ID(msg)
 	_ = err // TODO

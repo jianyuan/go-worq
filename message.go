@@ -1,6 +1,8 @@
 package worq
 
 type Message interface {
+	Queue() string
+
 	ID() string
 
 	Task() string
