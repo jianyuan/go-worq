@@ -12,3 +12,10 @@ func NewSignature(task string, args interface{}) *Signature {
 		Args: args,
 	}
 }
+
+func (sig *Signature) clone() *Signature {
+	newSig := new(Signature)
+	newSig.Task = sig.Task
+	newSig.Args = sig.Args
+	return newSig
+}
