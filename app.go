@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -34,6 +36,7 @@ type App struct {
 	protocol Protocol
 	binder   Binder
 
+	concurrency  int
 	defaultQueue string
 	idFunc       func() string
 
@@ -49,6 +52,7 @@ func New(options ...OptionFunc) (*App, error) {
 
 	app := new(App)
 	app.logger = logger
+	app.concurrency = 4
 	app.defaultQueue = "worq"
 	app.idFunc = func() string {
 		return uuid.Must(uuid.NewV4()).String()
@@ -90,22 +94,36 @@ func (app *App) Register(name string, f TaskFunc) error {
 }
 
 func (app *App) Start() error {
-	// TODO: implement me
 	app.logger.Info("Watch this space")
 
-	consumer, err := app.broker.Consume(app.Context(), app.defaultQueue)
-	if err != nil {
-		return err
+	g, ctx := errgroup.WithContext(app.Context())
+
+	for i := 0; i < 10; i++ {
+		g.Go(func() error {
+			consumer, err := app.broker.Consume(app.Context(), app.defaultQueue)
+			if err != nil {
+				return err
+			}
+
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+
+				default:
+					if !consumer.Next() {
+						return consumer.Err()
+					}
+
+					if err := app.consumerOnNext(consumer); err != nil {
+						app.logger.Errorf("error consuming message: %v", err)
+					}
+				}
+			}
+		})
 	}
 
-	for consumer.Next() {
-		// TODO: Set up worker pool
-		if err := app.consumerOnNext(consumer); err != nil {
-			app.logger.Errorf("error consuming message: %v", err)
-		}
-	}
-
-	return consumer.Err()
+	return g.Wait()
 }
 
 func (app *App) consumerOnNext(consumer Consumer) error {
@@ -206,6 +224,13 @@ func SetProtocol(protocol Protocol) OptionFunc {
 func SetBinder(binder Binder) OptionFunc {
 	return func(app *App) error {
 		app.binder = binder
+		return nil
+	}
+}
+
+func SetConcurrency(concurrency int) OptionFunc {
+	return func(app *App) error {
+		app.concurrency = concurrency
 		return nil
 	}
 }

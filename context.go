@@ -1,6 +1,8 @@
 package worq
 
 import (
+	"time"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,6 +18,14 @@ type Context interface {
 	Bind(v interface{}) error
 
 	Reject(requeue bool) error
+
+	Deadline() (deadline time.Time, ok bool)
+
+	Done() <-chan struct{}
+
+	Err() error
+
+	Value(key interface{}) interface{}
 }
 
 var _ Context = (*context)(nil)
@@ -52,4 +62,20 @@ func (ctx *context) Bind(v interface{}) error {
 
 func (ctx *context) Reject(requeue bool) error {
 	return &TaskRejected{Requeue: requeue}
+}
+
+func (*context) Deadline() (deadline time.Time, ok bool) {
+	return
+}
+
+func (*context) Done() <-chan struct{} {
+	return nil
+}
+
+func (*context) Err() error {
+	return nil
+}
+
+func (*context) Value(key interface{}) interface{} {
+	return nil
 }
