@@ -7,9 +7,8 @@ import (
 	"time"
 
 	uuid "github.com/gofrs/uuid"
-	"github.com/streadway/amqp"
-
 	worq "github.com/jianyuan/go-worq"
+	"github.com/streadway/amqp"
 )
 
 // OptionFunc is a function that configures the AMQPBroker.
@@ -25,7 +24,10 @@ type Broker struct {
 	connFactory ConnectionFactory
 
 	conn *amqp.Connection
-	ch   *amqp.Channel
+
+	// TODO: Extract these into a session struct
+	ch      *amqp.Channel
+	confirm chan amqp.Confirmation
 }
 
 func New(connectionFactory ConnectionFactory, options ...OptionFunc) (*Broker, error) {
@@ -33,6 +35,7 @@ func New(connectionFactory ConnectionFactory, options ...OptionFunc) (*Broker, e
 		exchange:     "go-worq",
 		exchangeType: "direct",
 		connFactory:  connectionFactory,
+		confirm:      make(chan amqp.Confirmation, 1),
 	}
 
 	for _, option := range options {
@@ -78,10 +81,14 @@ func (b *Broker) getChannel() (*amqp.Channel, error) {
 		}
 
 		// Put this channel into confirm mode
-		// err = b.ch.Confirm(false)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		err = b.ch.Confirm(false)
+		if err != nil {
+			// publisher confirms not supported
+			// TODO: logging
+			close(b.confirm)
+		} else {
+			b.ch.NotifyPublish(b.confirm)
+		}
 	}
 	return b.ch, nil
 }
@@ -185,8 +192,6 @@ func (b *Broker) Enqueue(pub *worq.Publishing) error {
 		return err
 	}
 
-	// confirms := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
-
 	// TODO: Retries
 	err = ch.Publish(
 		b.exchange, // exchange
@@ -205,11 +210,9 @@ func (b *Broker) Enqueue(pub *worq.Publishing) error {
 		return err
 	}
 
-	// if confirmed := <-confirms; confirmed.Ack {
-	// 	return nil
-	// }
-
-	// return errors.New("amqpbroker.Enqueue: Failed to receive acknowledgement from broker")
+	if confirmed, ok := <-b.confirm; ok && !confirmed.Ack {
+		return errors.New("amqpbroker.Enqueue: Failed to receive acknowledgement from broker")
+	}
 
 	// TODO: return publishing
 	return nil
