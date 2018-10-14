@@ -1,8 +1,12 @@
 package worq
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/sirupsen/logrus"
+)
 
 type MockContext struct {
+	emptyCtx
+
 	MessageFactory func() Message
 }
 
